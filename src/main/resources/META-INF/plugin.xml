@@ -1,0 +1,112 @@
+<idea-plugin>
+    <id>dev.solutionview</id>
+    <name>Solution View</name>
+    <vendor>solution-view</vendor>
+    <description><![CDATA[
+    Opens .NET solutions (<code>.sln</code> and <code>.slnx</code>) in a Rider-style <b>Solution</b> tab,
+    next to the normal Project file tree, and builds them with the <code>dotnet</code> CLI.
+    <ul>
+      <li>Solution folders, projects and the files MSBuild says belong to each project</li>
+      <li>Dependencies node with target frameworks, NuGet packages and project references</li>
+      <li>Show All Files, file nesting (<code>.xaml.cs</code>, <code>appsettings.*.json</code>, ...)</li>
+      <li>Build, Rebuild and Clean for the solution or one project, with errors in the Build tool window</li>
+      <li>Run configurations for every executable project (<code>dotnet run</code>)</li>
+      <li>Works on Windows, macOS and Linux</li>
+    </ul>
+    Needs the .NET SDK 8 or later.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lang</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <projectViewPane implementation="dev.solutionview.view.SolutionViewPane"/>
+        <projectViewNestingRulesProvider implementation="dev.solutionview.view.DotnetNestingRules"/>
+        <projectOpenProcessor implementation="dev.solutionview.open.SolutionOpenProcessor"/>
+        <postStartupActivity implementation="dev.solutionview.SolutionStartupActivity"/>
+        <notificationGroup id="Solution View" displayType="BALLOON"/>
+        <configurationType implementation="dev.solutionview.run.DotnetRunConfigurationType"/>
+    </extensions>
+
+    <actions>
+        <group id="SolutionView.SolutionBuildGroup" text="Build Solution" popup="false">
+            <action id="SolutionView.BuildSolution" class="dev.solutionview.actions.BuildSolutionAction"
+                    text="Build Solution" description="Build the open solution with dotnet build"
+                    icon="AllIcons.Actions.Compile">
+                <keyboard-shortcut keymap="$default" first-keystroke="control F9"/>
+                <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta F9" replace-all="true"/>
+            </action>
+            <action id="SolutionView.RebuildSolution" class="dev.solutionview.actions.RebuildSolutionAction"
+                    text="Rebuild Solution" description="Build the open solution from scratch"/>
+            <action id="SolutionView.CleanSolution" class="dev.solutionview.actions.CleanSolutionAction"
+                    text="Clean Solution" description="Delete the build output of the open solution"/>
+            <action id="SolutionView.StopBuild" class="dev.solutionview.actions.StopBuildAction"
+                    text="Cancel Build" description="Stop the running dotnet build"
+                    icon="AllIcons.Actions.Suspend"/>
+            <add-to-group group-id="BuildMenu" anchor="first"/>
+        </group>
+
+        <!-- Rebased stubs out the platform's run widget, so we add our own, like Rider's toolbar. -->
+        <group id="SolutionView.ToolbarGroup" popup="false">
+            <reference ref="SolutionView.BuildSolution"/>
+            <action id="SolutionView.RunConfigurationSelector" class="dev.solutionview.actions.RunConfigurationSelectorAction"
+                    text="Run Configuration"/>
+            <action id="SolutionView.RunSelected" class="dev.solutionview.actions.RunSelectedConfigurationAction"
+                    text="Run" description="Run the selected configuration" icon="AllIcons.Actions.Execute">
+                <keyboard-shortcut keymap="$default" first-keystroke="shift F10"/>
+                <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="control R" replace-all="true"/>
+            </action>
+            <action id="SolutionView.StopRunning" class="dev.solutionview.actions.StopRunningAction"
+                    text="Stop" description="Stop the running configuration" icon="AllIcons.Actions.Suspend">
+                <keyboard-shortcut keymap="$default" first-keystroke="control F2"/>
+                <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta F2" replace-all="true"/>
+            </action>
+            <add-to-group group-id="MainToolbarRight" anchor="first"/>
+        </group>
+
+        <group id="SolutionView.RunMenuGroup" popup="false">
+            <reference ref="SolutionView.RunSelected"/>
+            <reference ref="SolutionView.StopRunning"/>
+            <action id="SolutionView.EditConfigurations" class="dev.solutionview.actions.EditDotnetConfigurationsAction"
+                    text="Edit Configurations…" description="Add, change or remove run configurations"/>
+            <separator/>
+            <add-to-group group-id="RunMenu" anchor="first"/>
+        </group>
+
+        <!-- Right-click on the solution node. Each action hides itself on other nodes. -->
+        <group id="SolutionView.SolutionPopupGroup" popup="false">
+            <reference ref="SolutionView.BuildSolution"/>
+            <reference ref="SolutionView.RebuildSolution"/>
+            <reference ref="SolutionView.CleanSolution"/>
+            <separator/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="first"/>
+        </group>
+
+        <group id="SolutionView.ProjectPopupGroup" popup="false">
+            <action id="SolutionView.RunProject" class="dev.solutionview.actions.RunProjectAction"
+                    text="Run Project" description="Run the selected project with dotnet run"/>
+            <separator/>
+            <action id="SolutionView.BuildProject" class="dev.solutionview.actions.BuildProjectAction"
+                    text="Build Project" description="Build the selected project"
+                    icon="AllIcons.Actions.Compile"/>
+            <action id="SolutionView.RebuildProject" class="dev.solutionview.actions.RebuildProjectAction"
+                    text="Rebuild Project" description="Build the selected project from scratch"/>
+            <action id="SolutionView.CleanProject" class="dev.solutionview.actions.CleanProjectAction"
+                    text="Clean Project" description="Delete the build output of the selected project"/>
+            <action id="SolutionView.EditProjectFile" class="dev.solutionview.actions.EditProjectFileAction"
+                    text="Edit Project File" description="Open the project file in the editor"/>
+            <separator/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="first"/>
+        </group>
+
+        <action id="SolutionView.ShowAllFiles" class="dev.solutionview.actions.ShowAllFilesAction"
+                text="Show All Files" description="Also show files on disk that are not part of the project"
+                icon="AllIcons.Actions.ShowHiddens"/>
+        <action id="SolutionView.SelectSolution" class="dev.solutionview.actions.SelectSolutionAction"
+                text="Select Solution…" description="Choose which solution file to show"
+                icon="AllIcons.Actions.ListFiles"/>
+        <action id="SolutionView.Reload" class="dev.solutionview.actions.ReloadSolutionAction"
+                text="Reload Solution" description="Read the solution and all project files again"
+                icon="AllIcons.Actions.Refresh"/>
+    </actions>
+</idea-plugin>

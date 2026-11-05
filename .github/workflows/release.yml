@@ -1,0 +1,81 @@
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  # The Rebased release the plugin compiles against. Bump it when Rebased moves to a new platform version.
+  REBASED_VERSION: "1.1.23"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Download Rebased ${{ env.REBASED_VERSION }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/rebased"
+          gh release download "$REBASED_VERSION" --repo detachhead/rebased --pattern 'rebased.tar.gz' --dir "$RUNNER_TEMP"
+          tar -xzf "$RUNNER_TEMP/rebased.tar.gz" -C "$RUNNER_TEMP/rebased"
+          home=$(dirname "$(find "$RUNNER_TEMP/rebased" -maxdepth 2 -name product-info.json | head -1)")
+          echo "REBASED_PATH=$home" >> "$GITHUB_ENV"
+          grep -m1 '"buildNumber"' "$home/product-info.json"
+
+      - name: Version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then v="${GITHUB_REF_NAME#v}"; else v="0.0.0-dev.${GITHUB_RUN_NUMBER}"; fi
+          echo "PLUGIN_VERSION=$v" >> "$GITHUB_ENV"
+
+      - name: Test and build
+        run: ./gradlew unitTest buildPlugin -PpluginVersion="$PLUGIN_VERSION" --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: solution-view-${{ env.PLUGIN_VERSION }}
+          path: build/distributions/*.zip
+
+      - name: Write updatePlugins.xml
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          zip="solution-view-${PLUGIN_VERSION}.zip"
+          url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${zip}"
+          cat > build/distributions/updatePlugins.xml <<XML
+          <plugins>
+            <plugin id="dev.solutionview" url="${url}" version="${PLUGIN_VERSION}">
+              <idea-version since-build="261"/>
+              <name>Solution View</name>
+              <vendor>denisangel2k2</vendor>
+              <description>Rider-style .NET solution view, build, run and test for Rebased.</description>
+            </plugin>
+          </plugins>
+          XML
+          cat build/distributions/updatePlugins.xml
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "build/distributions/solution-view-${PLUGIN_VERSION}.zip" \
+            build/distributions/updatePlugins.xml \
+            --title "Solution View ${PLUGIN_VERSION}" --generate-notes
