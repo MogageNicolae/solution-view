@@ -64,7 +64,7 @@ jobs:
               <idea-version since-build="261"/>
               <name>Solution View</name>
               <vendor>denisangel2k2</vendor>
-              <description>Rider-style .NET solution view, build, run and test for Rebased.</description>
+              <description>Rider-style .NET solution view, build and run for Rebased.</description>
             </plugin>
           </plugins>
           XML
